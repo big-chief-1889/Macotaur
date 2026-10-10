@@ -9,6 +9,14 @@ This repo is the miner itself: a Swift package with the solver, pool client and 
 - An Apple Silicon Mac running macOS 15 or later
 - Xcode (or the Swift 6 toolchain) to build. Shaders are compiled at runtime, so the separate Metal toolchain isn't needed.
 
+## Download
+
+[Releases](https://github.com/big-chief-1889/Macotaur/releases) has the command-line miner as `macotaur-<version>-macos-arm64.zip`. It is ad-hoc signed and not notarized; if macOS blocks it after a browser download, clear the download flag:
+
+```
+xattr -d com.apple.quarantine macotaur
+```
+
 ## Build
 
 ```
