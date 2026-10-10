@@ -29,7 +29,18 @@ swift build -c release
 .build/release/macotaur --pool xtm-c29.kryptex.network:7040 --separator / --wallet <your XTM address> --worker mac
 ```
 
-LuckyPool also works: `--pool taric29.luckypool.io:3111` (it uses the default `.` separator). Stop with Ctrl-C, or pass `--minutes N`. For apps that run it as a helper, `--json` prints one stats object per line and SIGTERM stops it cleanly. `--help` lists the other options.
+LuckyPool also works: `--pool taric29.luckypool.io:3111` (it uses the default `.` separator). Stop with Ctrl-C, or pass `--minutes N`. `--intensity 50` rests the GPU half the time, for a cooler and quieter Mac. `--help` lists the other options.
+
+## Run it from another app
+
+- `--list-devices --json` prints the GPU, its memory and whether it can mine, without starting anything.
+- `--json` prints one stats object per line on stdout, every `--stats-interval` seconds, and sends log lines to stderr.
+- `--quiet` keeps the log to problems: a rejected share, a failed login, a lost connection.
+- `--intensity N` sets the percent of the time the GPU works, 1 to 100.
+- `--login-separator` is accepted as another name for `--separator`.
+- SIGTERM stops it cleanly.
+
+Each release zip comes with a `.sha256` file next to it.
 
 ## Use it as a library
 

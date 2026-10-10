@@ -61,13 +61,29 @@ public final class Miner: @unchecked Sendable {
         pool = PoolClient(options: options) { [weak self] e in self?.poolEvent(e) }
     }
 
-    public var stats: Stats { lock.withLock { _stats } }
+    public var stats: Stats {
+        lock.withLock {
+            var s = _stats
+            s.graphsPerSecond = rate(at: Date())
+            return s
+        }
+    }
 
-    /// Fraction of time the GPU is kept busy (0.1...1). Below 1 the miner
+    /// Graphs per second over the recent graphs. Once the next graph is
+    /// overdue the wait counts too, so the rate falls when mining stalls.
+    private func rate(at now: Date) -> Double {
+        guard recentGraphs.count > 1, let first = recentGraphs.first, let last = recentGraphs.last else { return 0 }
+        let n = Double(recentGraphs.count - 1)
+        let interval = last.timeIntervalSince(first) / n
+        let span = (now.timeIntervalSince(last) > 2 * interval ? now : last).timeIntervalSince(first)
+        return span > 0 ? n / span : 0
+    }
+
+    /// Fraction of time the GPU is kept busy (0.01...1). Below 1 the miner
     /// idles between graphs, trading speed for heat and power.
     public var dutyCycle: Double {
         get { lock.withLock { _dutyCycle } }
-        set { lock.withLock { _dutyCycle = min(1, max(0.1, newValue)) } }
+        set { lock.withLock { _dutyCycle = min(1, max(0.01, newValue)) } }
     }
 
     /// Does nothing after the first call: one start, one mining thread.
@@ -136,7 +152,17 @@ public final class Miner: @unchecked Sendable {
             // The graph just queued runs during this wait, so the wait spans
             // its GPU time plus the rest: gpu / duty in all.
             let (duty, gpu) = lock.withLock { (_dutyCycle, lastGPUSeconds) }
-            if duty < 1 && gpu > 0 { Thread.sleep(forTimeInterval: gpu / duty) }
+            if duty < 1 && gpu > 0 { rest(gpu / duty) }
+        }
+    }
+
+    /// Sleeps in short steps, so a long rest doesn't hold up stop().
+    private func rest(_ seconds: TimeInterval) {
+        let end = Date().addingTimeInterval(seconds)
+        while lock.withLock({ running }) {
+            let left = end.timeIntervalSinceNow
+            guard left > 0 else { return }
+            Thread.sleep(forTimeInterval: min(left, 0.25))
         }
     }
 
@@ -144,12 +170,8 @@ public final class Miner: @unchecked Sendable {
         let cycles = CycleFinder.findCycles(graph.edges)
         lock.withLock {
             _stats.graphs += 1
-            let now = Date()
-            recentGraphs.append(now)
+            recentGraphs.append(Date())
             if recentGraphs.count > 30 { recentGraphs.removeFirst(recentGraphs.count - 30) }
-            if recentGraphs.count > 1, let first = recentGraphs.first {
-                _stats.graphsPerSecond = Double(recentGraphs.count - 1) / now.timeIntervalSince(first)
-            }
         }
         guard !cycles.isEmpty else { return }
         proofQueue.async { self.submit(self.solver.proofs(for: graph, cycles: cycles), job: job, nonce: nonce) }

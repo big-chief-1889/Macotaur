@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Build the command-line miner and zip it for a release:
-# build/macotaur-<version>-macos-arm64.zip. The binary is ad-hoc signed.
+# build/macotaur-<version>-macos-arm64.zip, with its checksum in a .sha256
+# file beside it. The binary is ad-hoc signed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -15,4 +16,5 @@ codesign --force --sign - "$DIR/macotaur"
 VERSION=$("$DIR/macotaur" --version | awk '{print $2}')
 ZIP="build/macotaur-$VERSION-macos-arm64.zip"
 ditto -c -k --norsrc --noextattr --keepParent "$DIR" "$ZIP"
+(cd build && shasum -a 256 "${ZIP:t}" > "${ZIP:t}.sha256")
 echo "Packaged $ZIP"
